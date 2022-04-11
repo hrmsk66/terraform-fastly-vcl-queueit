@@ -29,10 +29,11 @@ locals {
   dictionary = {
     name = "queueit_config"
     items = {
-        "CustomerId"    = "XXX"
-        "EventId"       = "XXX"
-        "Queue_Baseurl" = "XXX"
-        "Secret_Key"    = "XXX"
+      "CustomerId"          = "XXX"
+      "EventId"             = "XXX"
+      "Queue_Baseurl"       = "XXX"
+      "Secret_Key"          = "XXX"
+      "Session_cookie_name" = "QueueITAccepted-SDFrts345E"
     }
   }
 }
