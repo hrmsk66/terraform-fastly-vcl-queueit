@@ -36,7 +36,7 @@ sub queueit_recv {
     if (req.url ~ "[?&]queueittoken=") {
         declare local var.location STRING;
         declare local var.host STRING;
-        set var.host = if(table.lookup(queueit_config, "Website_Host"), table.lookup(queueit_config, "Website_Host"), req.http.host);
+        set var.host = if(table.lookup(${config_table}, "Website_Host"), table.lookup(${config_table}, "Website_Host"), req.http.host);
         set var.location = if(req.is_ssl, "https://", "http://") + var.host
           + querystring.filter(req.url, "queueittoken");
     error 602 var.location;
@@ -49,7 +49,7 @@ sub queueit_recv_internal {
   /* PageUrl contains the protocol, the Host header and the path */
   declare local var.pageurl STRING;
   declare local var.host STRING;
-  set var.host = if(table.lookup(queueit_config, "Website_Host"), table.lookup(queueit_config, "Website_Host"), req.http.host);
+  set var.host = if(table.lookup(${config_table}, "Website_Host"), table.lookup(${config_table}, "Website_Host"), req.http.host);
   set var.pageurl = if(req.is_ssl, "https://", "http://") + var.host + req.url;
   /*
    * Variables (like var.pageurl above) are only local, not request wide. So we use
@@ -67,7 +67,7 @@ sub queueit_recv_internal {
     unset req.http.Queue-IT-Script-Version;
   }
   set req.http.Queue-IT-Script-Version = "fastly-vcl-1.0&cver=0";
-  set req.http.Queue-IT-EventId = table.lookup(queueit_config, "EventId");
+  set req.http.Queue-IT-EventId = table.lookup(${config_table}, "EventId");
   call validate_Queueit_cookie;
   if (req.http.Queue-IT-Cookie-Valid == "true") {
     /* valid cookie, do nothing */
@@ -80,9 +80,9 @@ sub queueit_recv_internal {
   }
   /* No Cookie, no token, redirect to queue
    * URL comprises of the base URL, queueit variables and the page URL. */
-  set var.location = table.lookup(queueit_config, "Queue_Baseurl")
-              + "?c=" + table.lookup(queueit_config, "CustomerId") 
-              + "&e=" + table.lookup(queueit_config, "EventId") 
+  set var.location = table.lookup(${config_table}, "Queue_Baseurl")
+              + "?c=" + table.lookup(${config_table}, "CustomerId") 
+              + "&e=" + table.lookup(${routing_table}, req.url.path, "vclwr1") 
               + "&ver=" + req.http.Queue-IT-Script-Version
               + "&t=" + urlencode(var.pageurl);
   error 602 var.location;
@@ -115,7 +115,7 @@ sub validate_Queueit_cookie {
       return;
     }
     /* include eventId to hash calc */
-    set var.computed_hash = digest.hmac_sha256(table.lookup(queueit_config, "Secret_key"),
+    set var.computed_hash = digest.hmac_sha256(table.lookup(${config_table}, "Secret_key"),
                                                var.queueid + var.extendable + var.expires);
     set var.computed_hash = regsub(var.computed_hash, "^0x", "");
     if (var.computed_hash != var.hash) {
@@ -129,14 +129,14 @@ sub validate_Queueit_cookie {
     if (var.extendable == "true") {
       set var.exptime = time.add(now, 20m);
       set var.expires = strftime({"%s"}, var.exptime);
-      set var.computed_hash = digest.hmac_sha256(table.lookup(queueit_config, "Secret_key"),
+      set var.computed_hash = digest.hmac_sha256(table.lookup(${config_table}, "Secret_key"),
                                                  var.queueid + var.extendable + var.expires);
       set var.computed_hash = regsub(var.computed_hash, "^0x", "");
       # add EventId to cookie value
       set var.decoded_cookie = "EventId=" + var.cookie_eventId + "&QueueId=" + var.queueid + "&IsCookieExtendable=true&Expires="
                                + var.expires + "&Hash=" + var.computed_hash;
       set var.cookie_exp = now + 24h;
-      set req.http.Queue-IT-Set-Cookie = table.lookup(queueit_config, "Session_cookie_name") +"="+ urlencode(var.decoded_cookie)
+      set req.http.Queue-IT-Set-Cookie = table.lookup(${config_table}, "Session_cookie_name") +"="+ urlencode(var.decoded_cookie)
                                          + "; expires=" + var.cookie_exp
       #   "CookieDomain" : ""
                                          + "; path=/; HttpOnly";
@@ -183,7 +183,7 @@ sub validate_queueit_token {
   else {
     return;
   }
-  set var.computed_hash = digest.hmac_sha256(table.lookup(queueit_config, "Secret_key"), var.token_wo_hash);
+  set var.computed_hash = digest.hmac_sha256(table.lookup(${config_table}, "Secret_key"), var.token_wo_hash);
   set var.computed_hash = regsub(var.computed_hash, "^0x", "");
   # check the hash matches
   if (var.hash != var.computed_hash) {
@@ -197,7 +197,7 @@ sub validate_queueit_token {
     set req.http.Queue-IT-Token = var.token;
     call queueit_err_redir;
   }
-  set var.cookie_validitytime = table.lookup(queueit_config, "Session_validity_time");
+  set var.cookie_validitytime = table.lookup(${config_table}, "Session_validity_time");
   # In Idle pahse cookie validity time is fixed at 3 minutes
   if (std.tolower(var.rt) == "idle"){
     set var.cookie_validitytime = "3m";
@@ -212,7 +212,7 @@ sub validate_queueit_token {
   /* Succesful token parse, set cookie and allow through */
   set var.exptime = time.add(now, 20m);
   set var.expires = strftime({"%s"}, var.exptime);
-  set var.computed_hash = digest.hmac_sha256(table.lookup(queueit_config, "Secret_key"),
+  set var.computed_hash = digest.hmac_sha256(table.lookup(${config_table}, "Secret_key"),
                                               var.queueid + var.extendable + var.expires);
   set var.computed_hash = regsub(var.computed_hash, "^0x", "");
   set var.decoded_cookie = "EventId=" + var.eventid
@@ -220,7 +220,7 @@ sub validate_queueit_token {
                             + "&IsCookieExtendable=" + std.tolower(var.extendable)
                             + "&Expires=" + var.expires + "&Hash=" + var.computed_hash;
   set var.cookie_exp = now + 24h;
-  set req.http.Queue-IT-Set-Cookie = table.lookup(queueit_config, "Session_cookie_name") +"="+ urlencode(var.decoded_cookie)
+  set req.http.Queue-IT-Set-Cookie = table.lookup(${config_table}, "Session_cookie_name") +"="+ urlencode(var.decoded_cookie)
                                       + "; expires=" + var.cookie_exp
   #   "CookieDomain" : ""
                                       + "; path=/; HttpOnly";
@@ -229,9 +229,9 @@ sub validate_queueit_token {
 
 sub queueit_err_redir {
   declare local var.location STRING;
-  set var.location = table.lookup(queueit_config, "Queue_Baseurl") + "error/" + req.http.Queue-IT-Error
-                + "?c=" + table.lookup(queueit_config, "CustomerId")
-                + "&e=" + table.lookup(queueit_config, "EventId") 
+  set var.location = table.lookup(${config_table}, "Queue_Baseurl") + "error/" + req.http.Queue-IT-Error
+                + "?c=" + table.lookup(${config_table}, "CustomerId")
+                + "&e=" + table.lookup(${config_table}, "EventId") 
                 + "&ver=" + req.http.Queue-IT-Script-Version
                 + "&queueittoken=" req.http.Queue-IT-Token
                 + "&ts=" + strftime({"%s"}, now);

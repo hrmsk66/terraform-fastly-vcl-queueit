@@ -22,24 +22,40 @@ resource "fastly_service_vcl" "service" {
 
   vcl {
     name    = "queueit_conn"
-    content = file("${path.module}/vcl/queueit_conn.vcl")
+    content = templatefile("${path.module}/vcl/queueit_conn.vcl", { config_table = var.config.name, routing_table = var.routing.name })
   }
 
   dictionary {
     name = var.dictionary.name
   }
 
+  dictionary {
+    name = var.routing.name
+  }
+
   force_destroy = true
 }
 
-resource "fastly_service_dictionary_items" "items" {
+resource "fastly_service_dictionary_items" "config" {
   for_each = {
-    for d in fastly_service_vcl.service.dictionary : d.name => d if d.name == var.dictionary.name
+    for d in fastly_service_vcl.service.dictionary : d.name => d if d.name == var.config.name
   }
 
   service_id    = fastly_service_vcl.service.id
   dictionary_id = each.value.dictionary_id
-  items         = var.dictionary.items
+  items         = var.config.items
+
+  manage_items = true
+}
+
+resource "fastly_service_dictionary_items" "routing" {
+  for_each = {
+    for d in fastly_service_vcl.service.dictionary : d.name => d if d.name == var.routing.name
+  }
+
+  service_id    = fastly_service_vcl.service.id
+  dictionary_id = each.value.dictionary_id
+  items         = var.routing.items
 
   manage_items = true
 }

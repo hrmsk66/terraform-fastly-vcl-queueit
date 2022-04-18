@@ -10,6 +10,10 @@ variable "dns_zone" {
   type = string
 }
 
-variable "dictionary" {
+variable "config" {
+  type = object({ name = string, items = map(string) })
+}
+
+variable "routing" {
   type = object({ name = string, items = map(string) })
 }
