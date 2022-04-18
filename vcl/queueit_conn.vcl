@@ -67,7 +67,7 @@ sub queueit_recv_internal {
     unset req.http.Queue-IT-Script-Version;
   }
   set req.http.Queue-IT-Script-Version = "fastly-vcl-1.0&cver=0";
-  set req.http.Queue-IT-EventId = table.lookup(${config_table}, "EventId");
+  set req.http.Queue-IT-EventId = table.lookup(${routing_table}, req.url.path, "vclwr1");
   call validate_Queueit_cookie;
   if (req.http.Queue-IT-Cookie-Valid == "true") {
     /* valid cookie, do nothing */
@@ -231,7 +231,7 @@ sub queueit_err_redir {
   declare local var.location STRING;
   set var.location = table.lookup(${config_table}, "Queue_Baseurl") + "error/" + req.http.Queue-IT-Error
                 + "?c=" + table.lookup(${config_table}, "CustomerId")
-                + "&e=" + table.lookup(${config_table}, "EventId") 
+                + "&e=" + table.lookup(${routing_table}, req.url.path, "vclwr1") 
                 + "&ver=" + req.http.Queue-IT-Script-Version
                 + "&queueittoken=" req.http.Queue-IT-Token
                 + "&ts=" + strftime({"%s"}, now);
