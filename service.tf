@@ -26,7 +26,7 @@ resource "fastly_service_vcl" "service" {
   }
 
   dictionary {
-    name = var.dictionary.name
+    name = var.config.name
   }
 
   dictionary {
